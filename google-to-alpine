@@ -5,6 +5,7 @@ require 'pathname'
 
 @google = 'google'
 
+# Set up the path to the `google` script.  If given a directory, append 'google'
 def setup_goog(path_or_script)
 	if File.directory?(path_or_script)
 		@google = Pathname.new(path_or_script) + "google"
@@ -13,11 +14,13 @@ def setup_goog(path_or_script)
 	end
 end
 
+# Parse commandline options
 optparse = OptionParser.new do |o|
 	o.on('--google PATH') { |p| setup_goog(p) }
 end
 optparse.parse!(ARGV)
 
+# Check for sane output from running `google --version`
 Open3.popen3(*[@google,'--version']) do |i,out,err|
 	ver = out.read
 	abort <<INSTALL if ver.empty?
@@ -32,15 +35,18 @@ Exiting, since I couldn't understand this output from #{@google} --version:
 UNEXPECTED
 end
 
+# Set up the contacts search
 cmd = [@google]
 cmd += %w{contacts list --fields=nickname,name,email --title .* --delimiter}
 cmd << "\t"
 
+# convert \xHH and \uHHHH escapes in the returned output into Unicode chars
 def unescape(val)
 	val.gsub!(/(\\x[\da-f]{2}|\\u[\da-f]{4})/) { [$1[2..-1].hex].pack('U') }
 	val
 end
 
+# run the contacts search, and spit out an Alpine addressbook
 Open3.popen3(*cmd) do |i,out,err|
 	out.each do |line|
 		line.chomp!
