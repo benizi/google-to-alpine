@@ -18,6 +18,20 @@ optparse = OptionParser.new do |o|
 end
 optparse.parse!(ARGV)
 
+Open3.popen3(*[@google,'--version']) do |i,out,err|
+	ver = out.read
+	abort <<INSTALL if ver.empty?
+You need to install the googlecl program
+from http://code.google.com/p/googlecl
+INSTALL
+	abort <<UNEXPECTED unless ver =~ /\Agoogle \d([\d.]+)\Z/
+Exiting, since I couldn't understand this output from #{@google} --version:
+>>>
+#{ver}
+<<<
+UNEXPECTED
+end
+
 cmd = [@google]
 cmd += %w{contacts list --fields=nickname,name,email --title .* --delimiter}
 cmd << "\t"
