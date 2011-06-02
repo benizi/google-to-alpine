@@ -1,0 +1,41 @@
+#!/usr/bin/env ruby
+require 'open3'
+require 'optparse'
+require 'pathname'
+
+@google = 'google'
+
+def setup_goog(path_or_script)
+	if File.directory?(path_or_script)
+		@google = Pathname.new(path_or_script) + "google"
+	else
+		@google = path_or_script
+	end
+end
+
+optparse = OptionParser.new do |o|
+	o.on('--google PATH') { |p| setup_goog(p) }
+end
+optparse.parse!(ARGV)
+
+cmd = [@google]
+cmd += %w{contacts list --fields=nickname,name,email --title .* --delimiter}
+cmd << "\t"
+
+def unescape(val)
+	val.gsub!(/(\\x[\da-f]{2}|\\u[\da-f]{4})/) { [$1[2..-1].hex].pack('U') }
+	val
+end
+
+Open3.popen3(*cmd) do |i,out,err|
+	out.each do |line|
+		line.chomp!
+		nick, name, emails = line.split("\t").map { |v| unescape v }
+		nick = '' if nick == 'None'
+		emails.split(", ").reject {|e| e == 'None'}.each do |email|
+			# remove an optional 'type' (e.g. home/work/other)
+			email.gsub!(/^\S+ /,'')
+			puts "#{nick}\t#{name}\t#{name} <#{email}>"
+		end
+	end
+end
