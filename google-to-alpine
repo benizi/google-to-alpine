@@ -4,6 +4,8 @@ require 'optparse'
 require 'pathname'
 
 @google = 'google'
+@from_stdin = false
+@delimiter = nil
 @search = '.'
 
 # Set up the path to the `google` script.  If given a directory, append 'google'
@@ -19,8 +21,12 @@ end
 optparse = OptionParser.new do |o|
 	o.on('--google PATH') { |p| setup_goog(p) }
 	o.on('--title STRING', '--search STRING') { |s| @search = s }
+	o.on('--stdin') { @from_stdin = true ; @delimiter ||= ',' }
+	o.on('--delimiter STRING') { |s| @delimiter = s }
 end
 optparse.parse!(ARGV)
+
+@delimiter ||= "\t"
 
 # Check for sane output from running `google --version`
 Open3.popen3(*[@google,'--version']) do |i,out,err|
@@ -37,11 +43,19 @@ Exiting, since I couldn't understand this output from #{@google} --version:
 UNEXPECTED
 end
 
-# Set up the contacts search
-cmd = [@google]
-cmd += %w{contacts list --fields=nickname,name,email}
-cmd << '--title' << @search
-cmd << '--delimiter' << "\t"
+# Get the list of contacts
+lines = nil
+if @from_stdin
+	# just read it from the passed filename or stdin
+	lines = ARGF.readlines
+else
+	# otherwise, run the googlecl utility
+	cmd = [@google]
+	cmd += %w{contacts list --fields=nickname,name,email}
+	cmd << '--title' << @search
+	cmd << '--delimiter' << @delimiter
+	Open3.popen3(*cmd) { |i,o,e| lines = o.readlines }
+end
 
 # convert \xHH and \uHHHH escapes in the returned output into Unicode chars
 def unescape(val)
@@ -50,15 +64,15 @@ def unescape(val)
 end
 
 # run the contacts search, and spit out an Alpine addressbook
-Open3.popen3(*cmd) do |i,out,err|
-	out.each do |line|
-		line.chomp!
-		nick, name, emails = line.split("\t").map { |v| unescape v }
-		nick = '' if nick == 'None'
-		emails.split(", ").reject {|e| e == 'None'}.each do |email|
-			# remove an optional 'type' (e.g. home/work/other)
-			email.gsub!(/^\S+ /,'')
-			puts "#{nick}\t#{name}\t#{name} <#{email}>"
-		end
+lines.each do |line|
+	line.chomp!
+	fields = line.split(@delimiter).map { |v| unescape v }
+	fields = [''] + fields if fields.size == 2
+	nick, name, emails = fields
+	nick = '' if nick == 'None'
+	emails.split(", ").reject {|e| e == 'None'}.each do |email|
+		# remove an optional 'type' (e.g. home/work/other)
+		email.gsub!(/^\S+ /,'')
+		puts "#{nick}\t#{name}\t#{name} <#{email}>"
 	end
 end
