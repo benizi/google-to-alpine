@@ -54,7 +54,18 @@ else
 	cmd += %w{contacts list --fields=nickname,name,email}
 	cmd << '--title' << @search
 	cmd << '--delimiter' << @delimiter
-	Open3.popen3(*cmd) { |i,o,e| lines = o.readlines }
+	errs = nil
+	Open3.popen3(*cmd) do |i,o,e|
+		lines = o.readlines
+		errs = e.readlines
+	end
+	warn <<ERRS unless errs.empty?
+Errors while running the search command...
+Command=#{cmd.join(' ')}
+Errors:
+#{errs}
+(Still running normally, if possible)
+ERRS
 end
 
 # convert \xHH and \uHHHH escapes in the returned output into Unicode chars
@@ -68,6 +79,10 @@ lines.each do |line|
 	line.chomp!
 	fields = line.split(@delimiter).map { |v| unescape v }
 	fields = [''] + fields if fields.size == 2
+	if fields.size != 3
+		warn "Parsing error:\nLine:#{line}\n"
+		next
+	end
 	nick, name, emails = fields
 	nick = '' if nick == 'None'
 	emails.split(", ").reject {|e| e == 'None'}.each do |email|
