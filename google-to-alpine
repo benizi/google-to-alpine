@@ -37,7 +37,7 @@ end
 
 # Set up the contacts search
 cmd = [@google]
-cmd += %w{contacts list --fields=nickname,name,email --title .* --delimiter}
+cmd += %w{contacts list --fields=nickname,name,email --title . --delimiter}
 cmd << "\t"
 
 # convert \xHH and \uHHHH escapes in the returned output into Unicode chars
