@@ -4,6 +4,7 @@ require 'optparse'
 require 'pathname'
 
 @google = 'google'
+@search = '.'
 
 # Set up the path to the `google` script.  If given a directory, append 'google'
 def setup_goog(path_or_script)
@@ -17,6 +18,7 @@ end
 # Parse commandline options
 optparse = OptionParser.new do |o|
 	o.on('--google PATH') { |p| setup_goog(p) }
+	o.on('--title STRING', '--search STRING') { |s| @search = s }
 end
 optparse.parse!(ARGV)
 
@@ -37,8 +39,9 @@ end
 
 # Set up the contacts search
 cmd = [@google]
-cmd += %w{contacts list --fields=nickname,name,email --title . --delimiter}
-cmd << "\t"
+cmd += %w{contacts list --fields=nickname,name,email}
+cmd << '--title' << @search
+cmd << '--delimiter' << "\t"
 
 # convert \xHH and \uHHHH escapes in the returned output into Unicode chars
 def unescape(val)
